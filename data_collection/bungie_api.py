@@ -49,6 +49,10 @@ class DestinyAccount:
     def membership_id(self):
         return self._membership_id
 
+    @property
+    def name(self):
+        return self._name
+
 
 def get_comp_match_ids(account, mode=69, matches=100):
     """
@@ -187,7 +191,8 @@ def get_comp_stat_df(account):
 
     comp_stats_df = pd.DataFrame()
 
-    print('\nCompiling match data. This may take a few minutes...')
+    print('\nCompiling match data. for ' + account.name +
+          '. This may take a few minutes...')
 
     for match in match_ids:
 
@@ -198,7 +203,7 @@ def get_comp_stat_df(account):
         comp_stats_df = comp_stats_df.append(match_stats, ignore_index=True,
                                              sort=False)
 
-    print('Match data compilation complete.\n')
+    print('Match data compilation for ' + account.name + ' is complete.\n')
 
     return comp_stats_df
 
