@@ -20,11 +20,11 @@ def create_connection(db_file):
     """
     try:
         conn = sqlite3.connect(db_file)
-        print('successfully connected')
+        print('Successfully connected to database')
         return conn
     except Error as e:
         print(e)
-        print('connection unsuccessful')
+        print('Connection unsuccessful')
     return None
 
 
@@ -187,8 +187,6 @@ def name_type_by_hash(hash_id, item_db_dict):
     except Exception as e:
         print(e)
         print('issue getting item name and type for hash_id ' + str(hash_id))
-
-
 
 
 def get_db_path():

@@ -47,45 +47,31 @@ class DestinyAccount:
         return self._membership_id
 
 
-def get_comp_match_ids(account, matches=200):
+def get_comp_match_ids(account, mode=69, matches=100):
 
     character_ids = account.get_character_ids()
 
-    # Destiny2.GetActivityHistory (for first character, comp only (mode=69))
-    activity_history_path = "/Destiny2/" + str(account.membership_type) +\
-                            "/Account/" + account.membership_id +\
-                            "/Character/" + character_ids[0] +\
-                            "/Stats/Activities/?mode=69"
-
-    req = requests.get(default_url + activity_history_path, headers=HEADERS)
-
-    activity_history_info = req.json()
-
-
-    '''
-    # test DestinyHistoricalStats
-    historical_stats_path = "/Destiny2/" + str(account.membership_type) +\
-                            "/Account/" + account.membership_id +\
-                            "/Character/" + character_ids[0] + "Stats/?2019-07-01"
-
-    req = requests.get(default_url + historical_stats_path, headers=HEADERS)
-    historical_stats_info = req.json()
-
-
-    # test
-    print(len(activity_history_info['Response']['activities']))
-    print(historical_stats_info.keys())
-    '''
-
     instance_id_values = []
-    match_count = 0
-    for i in activity_history_info['Response']['activities']:
-        if match_count > matches:
-            return instance_id_values  # stop at desired match count
-        else:
-            instance_id_values.append(i['activityDetails']['instanceId'])
 
-        match_count += 1
+    for character in character_ids:
+
+        activity_path = "/Destiny2/" + str(account.membership_type) + \
+                        "/Account/" + account.membership_id + \
+                        "/Character/" + character +\
+                        "/Stats/Activities/?count=" + str(matches) +\
+                        "&mode=" + str(mode)
+
+        req = requests.get(default_url + activity_path, headers=HEADERS)
+        character_activity_json = req.json()
+
+        if not character_activity_json['Response']:
+            # no character activity data - dict is empty
+            continue
+        else:
+            character_activities = character_activity_json['Response']['activities']
+
+            for activity in character_activities:
+                instance_id_values.append(activity['activityDetails']['instanceId'])
 
     return instance_id_values
 
@@ -108,40 +94,23 @@ def get_game_stats(game_id, account):
 
     pgcr_info = req.json()
 
-    activity_period = pgcr_info['Response']['period']
-    activity_details = pgcr_info['Response']['activityDetails']
-
     pgcr_entries = pgcr_info['Response']['entries']
-
-    pgcr_player_dict_list = []
 
     # iterate through players listed in PGCR
     for player in pgcr_entries:
-        # player values
-        #print(player['values'])
-        #player_dict = {}
-
-
-        # print pgcr extended weapon data
-        #print(player['extended']['weapons'])
 
         player_info = player['player']['destinyUserInfo']
-        stats = player['values']
-
-        try:
-            weapons_list = player['extended']['weapons']
-        except Exception as e:
-            print(e)
-            weapons_list = []
-
-        '''
-        # get list of weapon names for each player
-        for weapon in weapons_list:
-            print(get_weapon_by_id(weapon['referenceId'], player_info['membershipId']))
-        '''
 
         # only get player info for specified account
         if player_info['membershipId'] == account.membership_id:
+
+            stats = player['values']
+
+            try:
+                weapons_list = player['extended']['weapons']
+            except KeyError as e:
+                # no weapons in player PGCR extended data
+                weapons_list = []
 
             # compile player info into dictionary
             player_dict = {'display_name': player_info['displayName'],
@@ -157,46 +126,30 @@ def get_game_stats(game_id, account):
                            'kdr': stats['killsDeathsRatio']['basic']['value'],
                            'kda': stats['killsDeathsAssists']['basic']['value'],
                            'standing': stats['standing']['basic']['value'],
-                           'team': stats['team']['basic']['value'],
                            'team_score': stats['teamScore']['basic']['value']}
 
-            weapon_use_list = []
-            weapon_count = 0
+            if weapons_list:
 
-            # testing
-            for weapon in weapons_list:
-                #print(weapon)
+                top_weapon = weapons_list[0]
 
-                weapon_count += 1
+                reference_id = top_weapon['referenceId']
+                weapon_kills = top_weapon['values']['uniqueWeaponKills']['basic']['value']
 
-                reference_id = weapon['referenceId']
-                weapon_kills = weapon['values']['uniqueWeaponKills']['basic']['value']
-
-                #w_name_type = manifest.name_and_type(reference_id)
+                # get weapon (name,type) tuple from manifest
                 w_name_type = manifest.name_type_by_hash(reference_id, item_dict)
                 weapon_name = w_name_type[0]
                 weapon_type = w_name_type[1]
 
-                #weapon_use_list.append(tuple([reference_id, kills]))
-
-                key_name = 'weapon_' + str(weapon_count)
-                name_col = key_name + '_name'
-                type_col = key_name + '_type'
-                kills_col = key_name + '_kills'
+                name_col = 'weapon_name'
+                type_col = 'weapon_type'
+                kills_col = 'weapon_kills'
 
                 player_dict[name_col] = weapon_name
                 player_dict[type_col] = weapon_type
                 player_dict[kills_col] = weapon_kills
 
-                #player_dict[]
-
-            # append player dictionary to list
-            pgcr_player_dict_list.append(player_dict)
-
-            #print(player_dict.keys())
             game_df = pd.DataFrame.from_dict(player_dict, orient='index')
             return game_df.T  # return transposed game stats df
-            #return player_dict
 
     print('User not found in PGCR')
 
@@ -207,18 +160,17 @@ def get_comp_stat_df(account):
 
     comp_stats_df = pd.DataFrame()
 
+    print('\nCompiling match data. This may take a few minutes...')
+
     for match in match_ids:
 
         # obtain df of game statistics
         match_stats = get_game_stats(match, account)
 
-
-        # for testing purposes
-        #print(match_stats)
-
         # append each match to df of all match stats
         comp_stats_df = comp_stats_df.append(match_stats, ignore_index=True, sort=False)
 
+    print('Match data compilation complete.\n')
 
     return comp_stats_df
 
@@ -229,9 +181,14 @@ if __name__ == '__main__':
     pd.set_option('display.width', 500)
     pd.set_option('display.max_columns', 50)
 
+    account_names = ['IX Fall0ut XI',
+                     'PureChilly',
+                     'Seamusin',
+                     'NeutralDefault']
+
     my_account = DestinyAccount('PureChilly')
 
-    print(len(get_comp_match_ids(my_account)))
+    print('Competitive Matches Returned with Request to Bungie API: ', len(get_comp_match_ids(my_account)))
 
     print(get_comp_stat_df(my_account))
 
