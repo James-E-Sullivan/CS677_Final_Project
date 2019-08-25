@@ -5,6 +5,16 @@ import json
 
 
 def find_id(hash_id):
+    """
+    Finds signed integer value corresponding to
+    referenceId or hashId. Signed integer used as
+    key value in manifest db.
+
+    Note: Some items cannot be found with this approach.
+    Use item_json_by_hash and name_type_by_hash
+    :param hash_id:
+    :return: signed integer id used as manifest db key
+    """
     val = int(hash_id)
     if (val and (1 << (32 - 1))) != 0:
         val = val - (1 << 32)
@@ -120,7 +130,13 @@ hashes_trunc = {'DestinyInventoryItemDefinition': 'itemHash'}
 
 
 def build_item_dict(hash_dict):
-
+    """
+    Build dictionary of {hashID: json} pairs. Data obtained from
+    Destiny 2 world_sql_content_.sqlite3 database.
+    :param hash_dict: {sqlite3 tablename: condensed tablename} pair.
+    Associated with world_sql_content_.sqlite3 db
+    :return all_data: dict of data from sqlite3 db
+    """
     # connect to manifest
     db_path = get_db_path()
     conn = create_connection(db_path)
@@ -190,13 +206,21 @@ def name_type_by_hash(hash_id, item_db_dict):
 
 
 def get_db_path():
+    """
+    Gets path of world_sql_content_.sqlite3 db
+    :return:
+    """
     base_dir = os.path.dirname(os.path.abspath(__file__))
     db_name = "world_sql_content_.sqlite3"
     return os.path.join(base_dir, "manifests", db_name)
 
 
 def get_item_dict(reference_id):
-
+    """
+    Obtains item info dict from db
+    :param reference_id:
+    :return: item info dict
+    """
     db_path = get_db_path()
     manifest_conn = create_connection(db_path)
     item_id = find_id(reference_id)
@@ -205,7 +229,11 @@ def get_item_dict(reference_id):
 
 
 def name_and_type(reference_id):
-
+    """
+    Obtains name and type of item, by referenceId (hashId), from db
+    :param reference_id: hashId value of item
+    :return: tuple of (name, type) of item
+    """
     try:
         weapon_dict = get_item_dict(reference_id)
         weapon_name = weapon_dict['displayProperties']['name']
