@@ -1,68 +1,16 @@
-import requests
-import io
-import json
-import codecs
+import requests, io, json, codecs, copy, time
 import pandas as pd
-import copy
+import data_collection.manifest_hash_functions as manifest
+
 
 # dictionary to hold extra headers
 HEADERS = {"X-API-Key": '3ac88e4a357e47089618de29c972fbab'}
 
 default_url = "https://bungie.net/Platform"
 
-'''
-r = requests.get("https://bungie.net/Platform/Destiny2/SearchDestinyPlayer/-1/Seamusin/", headers=HEADERS)
-#r = requests.get()
-
-user_request = r.json()
-
-
-def get_response(request_json):
-    """
-    Get 'Response' info from request
-    :param request_json: response from requests.get().json()
-    :return: dictionary containing response info
-    """
-    return user_request['Response'][0]
-
-
-#user_info = user_request['Response'][0]  # dictionary of user info
-user_info = get_response(user_request)
-print(user_request)
-
-#historical_stats_url = default_url + "/Destiny2/" + user_info['membershipType'] + "/Account/" + user_info['membershipId'] + "/Character"
-
-#r = requests.get(default_url + "/Destiny2/2/Profile/" + user_info['membershipId'] + "/?components=100", headers=HEADERS)
-
-# example of working request using Bungie API documentation
-r = requests.get(default_url + "/User/GetMembershipsById/" + user_info['membershipId'] + "/" + str(user_info['membershipType']) + "/", headers=HEADERS)
-
-membership_info = get_response(r.json())
-
-
-# get profile
-# need to figure out why the components=100 part is necessary
-profile_path = "/Destiny2/" + str(user_info['membershipType']) + "/Profile/" + user_info['membershipId'] + "/?components=100"
-
-
-r = requests.get(default_url + profile_path, headers=HEADERS)
-profile_request = r.json()
-
-# obtain character id values (up to 3)
-character_ids = profile_request['Response']['profile']['data']['characterIds']
-
-
-'''
-
-'''
-# get historic stats for account
-historic_stats_path = "/Destiny2/" + str(user_info['membershipType']) + "/Account/" + user_info['membershipId'] + "/Stats"
-r = requests.get(default_url + historic_stats_path, headers=HEADERS)
-
-historic_stats_info = r.json()
-
-print(historic_stats_info['Response']['mergedAllCharacters']['results']['allPvP'].keys())
-'''
+# build dict of hash_id values mapped to json dictionary descriptions
+description_dicts = manifest.build_item_dict(manifest.hashes_trunc)
+item_dict = description_dicts['DestinyInventoryItemDefinition']
 
 
 class DestinyAccount:
@@ -99,7 +47,7 @@ class DestinyAccount:
         return self._membership_id
 
 
-def get_comp_match_ids(account, matches=100):
+def get_comp_match_ids(account, matches=200):
 
     character_ids = account.get_character_ids()
 
@@ -113,7 +61,21 @@ def get_comp_match_ids(account, matches=100):
 
     activity_history_info = req.json()
 
-    #print(activity_history_info['Response']['activities'])
+
+    '''
+    # test DestinyHistoricalStats
+    historical_stats_path = "/Destiny2/" + str(account.membership_type) +\
+                            "/Account/" + account.membership_id +\
+                            "/Character/" + character_ids[0] + "Stats/?2019-07-01"
+
+    req = requests.get(default_url + historical_stats_path, headers=HEADERS)
+    historical_stats_info = req.json()
+
+
+    # test
+    print(len(activity_history_info['Response']['activities']))
+    print(historical_stats_info.keys())
+    '''
 
     instance_id_values = []
     match_count = 0
@@ -136,14 +98,6 @@ def get_destiny_manifest():
     req = requests.get(default_url + manifest_path, headers=HEADERS)
     return req.json()
 
-'''
-def get_weapon_by_id(reference_id, account):
-    id_string = str(reference_id)
-    weapon_path = "/Destiny2/" + str(account.membership_type) + "/Profile/" + account.name + "/Item/" + id_string + "/"
-    req = requests.get(default_url + weapon_path, headers=HEADERS)
-    return req.json()
-'''
-
 
 def get_game_stats(game_id, account):
     """game_id from instance_id_values list"""
@@ -161,6 +115,7 @@ def get_game_stats(game_id, account):
 
     pgcr_player_dict_list = []
 
+    # iterate through players listed in PGCR
     for player in pgcr_entries:
         # player values
         #print(player['values'])
@@ -173,18 +128,22 @@ def get_game_stats(game_id, account):
         player_info = player['player']['destinyUserInfo']
         stats = player['values']
 
-
-        #weapons_list = player['extended']['weapons']
+        try:
+            weapons_list = player['extended']['weapons']
+        except Exception as e:
+            print(e)
+            weapons_list = []
 
         '''
         # get list of weapon names for each player
         for weapon in weapons_list:
             print(get_weapon_by_id(weapon['referenceId'], player_info['membershipId']))
         '''
-        # compile player info into dictionary
-        #if player_info['membershipId'] == user_info['membershipId']:
+
+        # only get player info for specified account
         if player_info['membershipId'] == account.membership_id:
 
+            # compile player info into dictionary
             player_dict = {'display_name': player_info['displayName'],
                            'membership_id': player_info['membershipId'],
                            'class': player['player']['characterClass'],
@@ -200,6 +159,36 @@ def get_game_stats(game_id, account):
                            'standing': stats['standing']['basic']['value'],
                            'team': stats['team']['basic']['value'],
                            'team_score': stats['teamScore']['basic']['value']}
+
+            weapon_use_list = []
+            weapon_count = 0
+
+            # testing
+            for weapon in weapons_list:
+                #print(weapon)
+
+                weapon_count += 1
+
+                reference_id = weapon['referenceId']
+                weapon_kills = weapon['values']['uniqueWeaponKills']['basic']['value']
+
+                #w_name_type = manifest.name_and_type(reference_id)
+                w_name_type = manifest.name_type_by_hash(reference_id, item_dict)
+                weapon_name = w_name_type[0]
+                weapon_type = w_name_type[1]
+
+                #weapon_use_list.append(tuple([reference_id, kills]))
+
+                key_name = 'weapon_' + str(weapon_count)
+                name_col = key_name + '_name'
+                type_col = key_name + '_type'
+                kills_col = key_name + '_kills'
+
+                player_dict[name_col] = weapon_name
+                player_dict[type_col] = weapon_type
+                player_dict[kills_col] = weapon_kills
+
+                #player_dict[]
 
             # append player dictionary to list
             pgcr_player_dict_list.append(player_dict)
@@ -223,8 +212,13 @@ def get_comp_stat_df(account):
         # obtain df of game statistics
         match_stats = get_game_stats(match, account)
 
+
+        # for testing purposes
+        #print(match_stats)
+
         # append each match to df of all match stats
-        comp_stats_df = comp_stats_df.append(match_stats, ignore_index=True)
+        comp_stats_df = comp_stats_df.append(match_stats, ignore_index=True, sort=False)
+
 
     return comp_stats_df
 
@@ -235,7 +229,9 @@ if __name__ == '__main__':
     pd.set_option('display.width', 500)
     pd.set_option('display.max_columns', 50)
 
-    my_account = DestinyAccount('Seamusin')
+    my_account = DestinyAccount('PureChilly')
+
+    print(len(get_comp_match_ids(my_account)))
 
     print(get_comp_stat_df(my_account))
 
