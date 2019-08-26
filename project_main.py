@@ -78,7 +78,6 @@ if __name__ == '__main__':
                      'Seamusin',
                      'NeutralDefault']
 
-    modified_dfs = []
     for name in account_names:
 
         # open csv file corresponding to name as a DataFrame
