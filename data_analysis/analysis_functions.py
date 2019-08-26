@@ -5,6 +5,7 @@ from sklearn import svm
 from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
 
 
 def logistic_regression_test(df1, df2):
@@ -45,21 +46,7 @@ weapon_type_dict = {'Auto Rifle': 'primary',
 
 def logistic_regression_categorical(df1, df2):
 
-
-
     training_df = copy.copy(df1)
-
-    '''
-    training_dummy_df = pd.DataFrame()
-
-
-    key_list = weapon_type_dict.keys()
-    
-    for weapon in key_list:
-
-        training_dummy_df[weapon] = np.zeros(len(training_df))
-
-    '''
 
     training_df['primary'] = training_df.weapon_type.apply(primary_category)
     training_df['special'] = training_df.weapon_type.apply(special_category)
@@ -67,18 +54,8 @@ def logistic_regression_categorical(df1, df2):
 
     print(training_df)
 
-    #print(training_df)
-
-    #input_data = training_df['weapon_type']
-    #dummies = pd.get_dummies(input_data)
-    #training_dummy_df = training_dummy_df.append(dummies, ignore_index=False, sort=True)
-    #print(dummies)
-
-    #print(training_dummy_df)
-
-    X = training_df[['primary', 'special']].values
+    X = training_df[['primary', 'special', 'heavy']].values
     print(X)
-
 
     le = LabelEncoder()
     Y = le.fit_transform(training_df['standing'].values)
@@ -91,7 +68,7 @@ def logistic_regression_categorical(df1, df2):
     prediction_df['special'] = prediction_df.weapon_type.apply(special_category)
     prediction_df['heavy'] = prediction_df.weapon_type.apply(heavy_category)
 
-    X_2 = prediction_df[['primary', 'special']].values
+    X_2 = prediction_df[['primary', 'special', 'heavy']].values
 
     prediction = log_reg_classifier.predict(X_2)
 
@@ -99,12 +76,14 @@ def logistic_regression_categorical(df1, df2):
     return prediction
 
 
-
-
-
 def weapon_type_win_rate(data):
 
-    return data[['standing']].groupby(['weapon_type']).mean().reset_index()
+    return data[['standing', 'weapon_type']].groupby(['weapon_type']).mean().reset_index()
+
+
+def most_used_weapons(data):
+
+    return data[['weapon_name']].groupby('weapon_name').count().reset_index()
 
 
 def primary_category(v):
@@ -154,34 +133,6 @@ def linear_svm_test(df1, df2):
 
 
 
-def k_d_linear_regression(df1, df2):
-
-    #x = df1[['kills', 'deaths']].values
-    #y = df1['standing'].values  # win/loss labels
-
-    x = df1['kills'].values
-    y = df1['deaths'].values
-
-    x = x[:, np.newaxis]  # flip axis of array x
-
-    lin_reg = LinearRegression(fit_intercept=True)
-    lin_reg.fit(x, y)
-
-    r_squared = lin_reg.score(x, y)
-    slope = lin_reg.coef_[0]
-    intercept = lin_reg.intercept_
-
-    plot_regression(x, y, slope, intercept)
-
-
-def plot_regression(x, y, slope, intercept):
-    plt.scatter(x, y, color="blue", marker="o")
-    y_pred = slope * x + intercept
-    plt.plot(x, y_pred, color='green', lw=3)
-
-    plt.xlabel('x')
-    plt.ylabel('y')
-    plt.show()
 
 
 
