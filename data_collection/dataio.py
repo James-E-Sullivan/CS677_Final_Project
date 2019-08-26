@@ -1,9 +1,5 @@
 import os
-import pandas as pd
 import data_collection.bungie_api as bng
-
-
-#test_df = pd.DataFrame(data=[[0, 1]], columns=['a', 'b'])
 
 
 def output_match_data(df_matches, name):
@@ -25,6 +21,9 @@ def output_match_data(df_matches, name):
 
 
 if __name__ == '__main__':
+    '''Run this to obtain new match data - either by updating
+    existing account files, or by adding new account files (which would
+    involve adding new names to account_names).'''
 
     account_names = ['IX Fall0ut XI',
                      'PureChilly',

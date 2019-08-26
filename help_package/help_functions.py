@@ -8,7 +8,3 @@ def show_more_df():
     pd.set_option('display.width', 500)
     pd.set_option('display.max_columns', 50)
 
-
-
-
-

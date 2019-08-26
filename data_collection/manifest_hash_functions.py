@@ -245,6 +245,3 @@ def name_and_type(reference_id):
         print('issue getting weapon name and type')
     return None
 
-
-
-

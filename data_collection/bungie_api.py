@@ -1,4 +1,5 @@
-import requests, io, json, codecs, copy, time
+import requests
+import json
 import pandas as pd
 import data_collection.manifest_hash_functions as manifest
 
@@ -34,9 +35,9 @@ class DestinyAccount:
         obtain character id hash values for account
         :return: list of character id hash values
         """
-        character_path = "/Destiny2/" + str(self._user_info['membershipType']) +\
-                       "/Profile/" + self._user_info['membershipId'] +\
-                       "/?components=100"
+        character_path = "/Destiny2/" + str(self._user_info['membershipType']) \
+                         + "/Profile/" + self._user_info['membershipId'] +\
+                         "/?components=100"
 
         req = requests.get(default_url + character_path, headers=HEADERS)
         return req.json()['Response']['profile']['data']['characterIds']
@@ -94,21 +95,27 @@ def get_comp_match_ids(account, mode=69, matches=100):
 
 
 def get_destiny_manifest():
-
     """
     Obtain Destiny 2 manifest json. This will give the user
     endpoints from which they can download manifest sqlite3 db's
     in their preferred language
     :return: manifest json
     """
-
     manifest_path = "/Destiny2/Manifest/"
     req = requests.get(default_url + manifest_path, headers=HEADERS)
     return req.json()
 
 
 def get_game_stats(game_id, account):
-    """game_id from instance_id_values list"""
+    """
+    Obtain info for a specific activity (with an instanceId).
+    Parse through PostGameCarnageReport (PGCR) data to find
+    most necessary info. Obtain weapon descriptions from destiny
+    manifest (dictionary).
+    :param game_id: instanceId value for a Destiny activity
+    :param account: Destiny account object
+    :return: DataFrame with single same info
+    """
 
     # Destiny2.GetPostGameCarnageReport
     pgcr_path = "/Destiny2/Stats/PostGameCarnageReport/" + game_id
@@ -152,10 +159,12 @@ def get_game_stats(game_id, account):
                            'standing': stats['standing']['basic']['value'],
                            'team_score': stats['teamScore']['basic']['value']}
 
+            # if weapons_list is not empty, iterate through it
             if weapons_list:
 
-                top_weapon = weapons_list[0]
+                top_weapon = weapons_list[0]  # data for weapon w/ most kills
 
+                # get reference id and weapon kill values
                 reference_id = top_weapon['referenceId']
                 weapon_kills = top_weapon['values'][
                     'uniqueWeaponKills']['basic']['value']
@@ -166,14 +175,17 @@ def get_game_stats(game_id, account):
                 weapon_name = w_name_type[0]
                 weapon_type = w_name_type[1]
 
+                # column names
                 name_col = 'weapon_name'
                 type_col = 'weapon_type'
                 kills_col = 'weapon_kills'
 
+                # add column values to player_dict
                 player_dict[name_col] = weapon_name
                 player_dict[type_col] = weapon_type
                 player_dict[kills_col] = weapon_kills
 
+            # create DataFrame with player_dict
             game_df = pd.DataFrame.from_dict(player_dict, orient='index')
             return game_df.T  # return transposed game stats df
 
@@ -187,13 +199,17 @@ def get_comp_stat_df(account):
     :param account: DestinyAccount object
     :return: Compiled account match DataFrame
     """
+
+    # get list of match id's (activity instanceId values)
     match_ids = get_comp_match_ids(account)
 
+    # create DataFrame to hold stats from all games in match_ids
     comp_stats_df = pd.DataFrame()
 
     print('\nCompiling match data. for ' + account.name +
           '. This may take a few minutes...')
 
+    # iterate through all matches in match_ids
     for match in match_ids:
 
         # obtain df of game statistics
@@ -206,22 +222,3 @@ def get_comp_stat_df(account):
     print('Match data compilation for ' + account.name + ' is complete.\n')
 
     return comp_stats_df
-
-
-if __name__ == '__main__':
-
-    pd.set_option('display.max_rows', 100)
-    pd.set_option('display.width', 500)
-    pd.set_option('display.max_columns', 50)
-
-    account_names = ['IX Fall0ut XI',
-                     'PureChilly',
-                     'Seamusin',
-                     'NeutralDefault']
-
-    my_account = DestinyAccount('Seamusin')
-
-    print('Competitive Matches Returned with Request to Bungie API: ',
-          len(get_comp_match_ids(my_account)))
-
-    print(get_comp_stat_df(my_account))
